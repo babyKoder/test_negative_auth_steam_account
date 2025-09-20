@@ -1,53 +1,52 @@
-import time
+import random
 
 import pytest
+from faker import Faker
+from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
-from selenium import webdriver
 
 @pytest.fixture(scope="function")
 def browser():
-    browser = webdriver.Chrome()
+    browser = webdriver.Firefox()
     yield browser
     browser.quit()
 
 
-LINKS = [
-    'https://store.steampowered.com/'
-]
+LINK = 'https://store.steampowered.com/'
 TIMEOUT = 10
+LENGTH_PASS = random.randint(1,60)
+EMAIL_DOMAIN = 'example.com'
+BTN_ENTRANCE_LOCATOR = (By.XPATH, '//*[contains(@class, "global_action_link") and @href]')
+INPUT_LOGIN_LOCATOR = (By.XPATH, '//*[@data-featuretarget="login"]//input[@type="text"]')
+INPUT_PASS_LOCATOR = (By.XPATH, '//*[@data-featuretarget="login"]//input[@type="password"]')
+BTN_AUTH_LOCATOR = (By.XPATH, '//*[@data-featuretarget="login"]//button')
+ERROR_MESSAGE_LOCATOR = (By.XPATH, '//*[@data-featuretarget="login"]//button/parent::div/following-sibling::div')
 
-@pytest.mark.parametrize('link', LINKS)
-def test_negative_authorization(browser, link):
+
+def test_negative_authorization(browser):
     wait = WebDriverWait(browser, TIMEOUT)
-    browser.get(link)
+    browser.get(LINK)
 
-    btn_entrance_locator = (By.XPATH,'//*[@id="global_action_menu"]/child::a[contains(@class,"global_action_link")]')
-    btn_entrance = wait.until(EC.element_to_be_clickable(btn_entrance_locator))
+    btn_entrance = wait.until(EC.element_to_be_clickable(BTN_ENTRANCE_LOCATOR))
     btn_entrance.click()
 
-    input_login_locator = (By.XPATH,'//*[contains(text(),"Войдите, используя имя")]/following-sibling::input')
-    # .//input[@type="text"] вот так находит 4 элемента
-    input_login = wait.until(EC.visibility_of_element_located(input_login_locator))
-    input_login.send_keys('login')
+    input_login = wait.until(EC.visibility_of_element_located(INPUT_LOGIN_LOCATOR))
+    input_login.send_keys(Faker().email(True,EMAIL_DOMAIN))
 
-    input_pass_locator =  (By.XPATH, '//*[contains(text(),"Пароль")]/following-sibling::input')
-    input_pass = wait.until(EC.visibility_of_element_located(input_pass_locator))
-    input_pass.send_keys('qwerty123')
+    input_pass = wait.until(EC.visibility_of_element_located(INPUT_PASS_LOCATOR))
+    input_pass.send_keys(Faker().password(LENGTH_PASS, True, True, True))
 
-    btn_auth_locator = (By.XPATH,'//button[contains(text(),"Войти")]')
-    btn_auth = wait.until(EC.element_to_be_clickable(btn_auth_locator))
+    btn_auth = wait.until(EC.element_to_be_clickable(BTN_AUTH_LOCATOR))
     btn_auth.click()
 
-    error_message_locator = (By.XPATH,'//*[contains(text(),"Пожалуйста, проверьте свой ")]')
-    error_message = wait.until(EC.element_to_be_clickable(error_message_locator))
+    wait.until(EC.element_attribute_to_include(BTN_AUTH_LOCATOR, "disabled"))
+    wait.until_not(EC.element_attribute_to_include(BTN_AUTH_LOCATOR, "disabled"))
 
+    error_message = wait.until(EC.visibility_of_element_located(ERROR_MESSAGE_LOCATOR))
     actual_error = error_message.text
+
     expected_error = "Пожалуйста, проверьте свой пароль и имя аккаунта и попробуйте снова."
-    assert (
-        actual_error == expected_error,
-        f"Ожидаемое значение - {expected_error}, а Фактическое - {actual_error}"
-    )
 
-
+    assert actual_error == expected_error, f"Ожидаемое значение - {expected_error}, а Фактическое - {actual_error}"
